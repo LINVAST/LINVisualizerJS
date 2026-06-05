@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+
+usage() {
+    cat <<'USAGE'
+Usage: ./run [options]
+
+Options:
+      --host <host>  Host interface. Default: 127.0.0.1.
+      --port <port>  HTTP port. Default: 5174.
+      --no-build     Serve the existing dist directory.
+      --open         Open the app in the default browser.
+  -h, --help         Show this help text.
+USAGE
+}
+
+host="127.0.0.1"
+port="5174"
+no_build=0
+open=0
+
+while (($#)); do
+    case "$1" in
+        --host)
+            shift
+            if [[ -z "${1-}" ]]; then
+                printf 'error: --host requires a value\n' >&2
+                exit 1
+            fi
+            host="$1"
+            ;;
+        --port)
+            shift
+            if [[ -z "${1-}" ]]; then
+                printf 'error: --port requires a value\n' >&2
+                exit 1
+            fi
+            port="$1"
+            ;;
+        --no-build)
+            no_build=1
+            ;;
+        --open)
+            open=1
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            printf 'error: unknown option %s\n' "$1" >&2
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+if [[ "$no_build" -eq 0 ]]; then
+    node "${SCRIPT_DIR}/scripts/build.mjs"
+fi
+
+server_args=(--root "${SCRIPT_DIR}/dist" --host "$host" --port "$port")
+if [[ "$open" -eq 1 ]]; then
+    server_args+=(--open)
+fi
+
+node "${SCRIPT_DIR}/scripts/server.mjs" "${server_args[@]}"

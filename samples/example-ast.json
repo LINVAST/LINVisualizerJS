@@ -1,0 +1,170 @@
+{
+  "Name": null,
+  "NodeType": "SourceNode",
+  "Line": 1,
+  "Children": [
+    {
+      "NodeType": "FuncDefNode",
+      "Line": 1,
+      "Children": [
+        {
+          "Modifiers": {
+            "AccessModifiers": "Unspecified",
+            "QualifierFlags": "None"
+          },
+          "TypeName": "int",
+          "NodeType": "DeclSpecsNode",
+          "Line": 1,
+          "Children": []
+        },
+        {
+          "Pointer": false,
+          "NodeType": "FuncDeclNode",
+          "Line": 1,
+          "Children": [
+            {
+              "Identifier": "main",
+              "NodeType": "IdNode",
+              "Line": 1,
+              "Children": []
+            },
+            {
+              "IsVariadic": false,
+              "NodeType": "FuncParamsNode",
+              "Line": 1,
+              "Children": []
+            }
+          ]
+        },
+        {
+          "NodeType": "BlockStatNode",
+          "Line": 2,
+          "Children": [
+            {
+              "NodeType": "DeclStatNode",
+              "Line": 3,
+              "Children": [
+                {
+                  "Modifiers": {
+                    "AccessModifiers": "Unspecified",
+                    "QualifierFlags": "None"
+                  },
+                  "TypeName": "int",
+                  "NodeType": "DeclSpecsNode",
+                  "Line": 3,
+                  "Children": []
+                },
+                {
+                  "NodeType": "DeclListNode",
+                  "Line": 3,
+                  "Children": [
+                    {
+                      "Pointer": false,
+                      "NodeType": "VarDeclNode",
+                      "Line": 3,
+                      "Children": [
+                        {
+                          "Identifier": "value",
+                          "NodeType": "IdNode",
+                          "Line": 3,
+                          "Children": []
+                        },
+                        {
+                          "Value": 42,
+                          "Suffix": null,
+                          "TypeCode": "Int32",
+                          "NodeType": "LitExprNode",
+                          "Line": 3,
+                          "Children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "NodeType": "IfStatNode",
+              "Line": 5,
+              "Children": [
+                {
+                  "Operator": ">",
+                  "NodeType": "BinExprNode",
+                  "Line": 5,
+                  "Children": [
+                    {
+                      "Identifier": "value",
+                      "NodeType": "IdNode",
+                      "Line": 5,
+                      "Children": []
+                    },
+                    {
+                      "Value": 10,
+                      "Suffix": null,
+                      "TypeCode": "Int32",
+                      "NodeType": "LitExprNode",
+                      "Line": 5,
+                      "Children": []
+                    }
+                  ]
+                },
+                {
+                  "NodeType": "ExprStatNode",
+                  "Line": 6,
+                  "Children": [
+                    {
+                      "Operator": "=",
+                      "NodeType": "AssignExprNode",
+                      "Line": 6,
+                      "Children": [
+                        {
+                          "Identifier": "value",
+                          "NodeType": "IdNode",
+                          "Line": 6,
+                          "Children": []
+                        },
+                        {
+                          "Operator": "-",
+                          "NodeType": "BinExprNode",
+                          "Line": 6,
+                          "Children": [
+                            {
+                              "Identifier": "value",
+                              "NodeType": "IdNode",
+                              "Line": 6,
+                              "Children": []
+                            },
+                            {
+                              "Value": 1,
+                              "Suffix": null,
+                              "TypeCode": "Int32",
+                              "NodeType": "LitExprNode",
+                              "Line": 6,
+                              "Children": []
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "NodeType": "ReturnStatNode",
+              "Line": 9,
+              "Children": [
+                {
+                  "Identifier": "value",
+                  "NodeType": "IdNode",
+                  "Line": 9,
+                  "Children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

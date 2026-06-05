@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LINVisualizerJS</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">LV</div>
+          <div>
+            <h1>LINVisualizerJS</h1>
+            <span id="statusLine">No AST loaded</span>
+          </div>
+        </div>
+        <div class="top-actions" role="toolbar" aria-label="Primary actions">
+          <label class="file-button" title="Open LINVAST JSON">
+            <input id="fileInput" type="file" accept=".json,application/json">
+            Open
+          </label>
+          <button id="sampleButton" type="button" title="Load sample AST">Sample</button>
+          <button id="fitButton" type="button" title="Fit tree to the viewer">Fit</button>
+          <button id="resetButton" type="button" title="Reset pan and zoom">Reset</button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <aside class="input-panel" aria-label="AST input and node details">
+          <section class="panel-section input-section">
+            <div class="section-header">
+              <h2>AST Input</h2>
+              <button id="clearButton" type="button">Clear</button>
+            </div>
+            <textarea id="jsonInput" spellcheck="false" placeholder="Paste LINVAST AST JSON"></textarea>
+            <div class="button-row">
+              <button id="renderButton" type="button" class="primary">Render</button>
+              <button id="formatButton" type="button">Format</button>
+            </div>
+            <div id="message" class="message" role="status"></div>
+          </section>
+
+          <section class="panel-section stats-section">
+            <h2>Stats</h2>
+            <dl class="stats-grid">
+              <div>
+                <dt>Nodes</dt>
+                <dd id="nodeCount">0</dd>
+              </div>
+              <div>
+                <dt>Visible</dt>
+                <dd id="visibleCount">0</dd>
+              </div>
+              <div>
+                <dt>Depth</dt>
+                <dd id="treeDepth">0</dd>
+              </div>
+              <div>
+                <dt>Matches</dt>
+                <dd id="matchCount">0</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="panel-section details-section">
+            <h2>Selected Node</h2>
+            <div id="nodeDetails" class="node-details empty-details">None</div>
+          </section>
+        </aside>
+
+        <section class="viewer-panel" aria-label="AST tree viewer">
+          <div class="viewer-toolbar" role="toolbar" aria-label="Tree controls">
+            <label class="search-control">
+              <span>Search</span>
+              <input id="searchInput" type="search" autocomplete="off">
+            </label>
+            <label class="number-control">
+              <span>Depth</span>
+              <input id="maxDepthInput" type="number" min="0" step="1" value="0">
+            </label>
+            <label class="check-control">
+              <input id="propertiesToggle" type="checkbox" checked>
+              <span>Properties</span>
+            </label>
+            <button id="expandButton" type="button" title="Expand the selected node">Expand</button>
+            <button id="collapseButton" type="button" title="Collapse the selected node">Collapse</button>
+            <button id="layoutButton" type="button" title="Reset moved nodes to computed positions">Reset layout</button>
+            <div class="zoom-control">
+              <span>Zoom</span>
+              <input id="zoomRange" type="range" min="25" max="220" value="100">
+              <output id="zoomLabel">100%</output>
+            </div>
+          </div>
+
+          <div id="viewer" class="viewer">
+            <svg id="treeSvg" class="tree-svg" role="img" aria-label="AST tree">
+              <g id="contentLayer"></g>
+            </svg>
+            <div id="emptyState" class="empty-state">Load LINVAST JSON</div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
