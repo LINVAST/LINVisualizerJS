@@ -1,5 +1,7 @@
 # LINVisualizerJS
 
+![showcase](./images/showcase.png)
+
 Interactive browser visualizer for LINVAST AST JSON output.
 
 ## Usage
