@@ -5,6 +5,17 @@ import { spawn } from "node:child_process";
 
 const projectRoot = resolve(new URL("..", import.meta.url).pathname);
 
+// linvast CLI resolution (PATH linvast -> $LINVAST_PATH -> native executable
+// fallback below). The fallback is relative to the project root so the path
+// stays portable across machines; the PATH/$LINVAST_PATH lookups let callers
+// softcode the binary location per-environment instead of relying on the
+// fallback alone.
+const CLI_PATH = resolve(projectRoot, "../CLI/CLI/bin/Debug/net10.0/CLI");
+const CLI_NAME = process.platform === "win32" ? "linvast.exe" : "linvast";
+const SUPPORTED_LANGUAGES = new Set(["c", "go", "java", "lua", "kotlin", "python"]);
+const MAX_SOURCE_BYTES = 1048576;
+const AST_ENDPOINT = "/api/ast";
+
 const options = {
   root: join(projectRoot, "dist"),
   host: "127.0.0.1",
@@ -54,6 +65,15 @@ const contentTypes = new Map([
 
 const server = createServer((request, response) => {
   const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
+  if (url.pathname === AST_ENDPOINT) {
+    if (request.method !== "POST") {
+      sendText(response, 405, "Method not allowed. Send a POST request with source code as the body.");
+      return;
+    }
+    handleAstRequest(request, response).catch(() => {});
+    return;
+  }
+
   let requestPath = decodeURIComponent(url.pathname);
   if (requestPath === "/") {
     requestPath = "/index.html";
@@ -121,4 +141,159 @@ function openBrowser(url) {
     detached: true,
     stdio: "ignore"
   }).unref();
+}
+
+function parseLanguage(value) {
+  const lang = String(value ?? "c").toLowerCase();
+  return SUPPORTED_LANGUAGES.has(lang) ? lang : null;
+}
+
+function resolveCliFromPath() {
+  const delimiter = process.platform === "win32" ? ";" : ":";
+  const dirs = (process.env.PATH ?? "").split(delimiter).filter(Boolean);
+  for (const dir of dirs) {
+    const candidate = join(dir, CLI_NAME);
+    try {
+      if (existsSync(candidate) && statSync(candidate).isFile()) {
+        return candidate;
+      }
+    } catch { /* skip inaccessible directories */ }
+  }
+  return null;
+}
+
+function resolveCliCommand() {
+  const fromPath = resolveCliFromPath();
+  if (fromPath) {
+    return fromPath;
+  }
+  const envPath = process.env.LINVAST_PATH;
+  if (envPath && existsSync(envPath)) {
+    return envPath;
+  }
+  if (existsSync(CLI_PATH)) {
+    return CLI_PATH;
+  }
+  return null;
+}
+
+function readRequestBody(request, maxBytes) {
+  return new Promise(resolve => {
+    let size = 0;
+    let tooLarge = false;
+    const chunks = [];
+    request.on("data", chunk => {
+      if (tooLarge) {
+        return;
+      }
+      size += chunk.length;
+      if (size > maxBytes) {
+        tooLarge = true;
+        request.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    request.on("end", () => resolve(tooLarge ? null : Buffer.concat(chunks)));
+    request.on("error", () => resolve(null));
+  });
+}
+
+function runCli(command, args, stdin) {
+  return new Promise(resolve => {
+    const proc = spawn(command, args, {
+      stdio: ["pipe", "pipe", "pipe"]
+    });
+
+    const stdout = [];
+    const stderr = [];
+    proc.stdout.on("data", data => stdout.push(data));
+    proc.stderr.on("data", data => stderr.push(data));
+
+    proc.on("error", error => {
+      resolve({
+        code: null,
+        stdout: Buffer.concat(stdout).toString("utf8"),
+        stderr: Buffer.concat(stderr).toString("utf8"),
+        error: error.message
+      });
+    });
+
+    proc.on("close", code => {
+      resolve({
+        code,
+        stdout: Buffer.concat(stdout).toString("utf8"),
+        stderr: Buffer.concat(stderr).toString("utf8")
+      });
+    });
+
+    proc.stdin.write(stdin);
+    proc.stdin.end();
+  });
+}
+
+function cleanCliError(stderr) {
+  const text = String(stderr ?? "");
+  if (!text.trim()) {
+    return "";
+  }
+
+  const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+  const diagnostic = lines.find(line => /[\w]+\s+\[\-\]/.test(line) || /FTL|ERR|FATAL/.test(line)) || lines[0];
+  return diagnostic.replace(/^\[\d{2}:\d{2}:\d{2}\s+\w+\]\s+\[[^\]]*\]\s*/, "").trim();
+}
+
+async function handleAstRequest(request, response) {
+  try {
+    const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
+    const language = parseLanguage(url.searchParams.get("language"));
+    if (!language) {
+      return sendText(response, 400, "Unsupported or missing language. Supported: c, go, java, lua, kotlin, python");
+    }
+
+    const command = resolveCliCommand();
+    if (!command) {
+      return sendText(response, 503, "linvast CLI is not available on this server");
+    }
+
+    const source = await readRequestBody(request, MAX_SOURCE_BYTES);
+    if (source === null) {
+      return sendText(response, 413, "Submitted source code exceeds the maximum allowed size");
+    }
+
+    const completed = await runCli(command, ["ast", "-", "--language", language, "--compact", "-q"], source);
+    if (completed.error) {
+      return sendText(response, 500, `Failed to run linvast CLI: ${completed.error}`);
+    }
+
+    if (completed.code === 0) {
+      const payload = completed.stdout;
+      try {
+        JSON.parse(payload);
+      } catch {
+        return sendText(response, 502, "linvast CLI returned non-JSON output");
+      }
+      return sendRaw(response, 200, payload, "application/json; charset=utf-8");
+    }
+
+    return sendText(response, 422, cleanCliError(completed.stderr) || "linvast CLI failed");
+  } catch (error) {
+    return sendText(response, 500, `internal server error: ${error.message}`);
+  }
+}
+
+function sendRaw(response, status, body, contentType) {
+  response.writeHead(status, {
+    "content-type": contentType,
+    "cache-control": "no-store"
+  });
+  response.end(body);
+}
+
+function sendJson(response, status, body) {
+  return sendRaw(response, status, JSON.stringify(body), "application/json; charset=utf-8");
+}
+
+function sendText(response, status, message) {
+  return sendRaw(response, status, message, "text/plain; charset=utf-8");
 }

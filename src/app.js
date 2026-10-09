@@ -34,6 +34,7 @@
     searchQuery: "",
     showProperties: true,
     maxDepth: 0,
+    inputMode: "ast",
     zoom: 1,
     panX: 40,
     panY: 40,
@@ -55,6 +56,10 @@
     renderButton: document.getElementById("renderButton"),
     formatButton: document.getElementById("formatButton"),
     jsonInput: document.getElementById("jsonInput"),
+    modeAst: document.getElementById("modeAst"),
+    modeSource: document.getElementById("modeSource"),
+    languageControl: document.getElementById("languageControl"),
+    languageSelect: document.getElementById("languageSelect"),
     message: document.getElementById("message"),
     statusLine: document.getElementById("statusLine"),
     nodeCount: document.getElementById("nodeCount"),
@@ -79,6 +84,7 @@
   wireEvents();
   updateStats();
   updateTransform();
+  setControls("ast");
   void loadSample();
 
   function wireEvents() {
@@ -87,8 +93,23 @@
     elements.fitButton.addEventListener("click", fitToView);
     elements.resetButton.addEventListener("click", resetView);
     elements.clearButton.addEventListener("click", clearInput);
-    elements.renderButton.addEventListener("click", renderFromInput);
+    elements.renderButton.addEventListener("click", () => void renderCurrent());
     elements.formatButton.addEventListener("click", formatInput);
+    elements.modeAst.addEventListener("click", () => {
+      setControls("ast");
+      void restoreAstSample(false);
+    });
+    elements.modeSource.addEventListener("click", () => {
+      setControls("source");
+      restoreSourceSample(false);
+    });
+    elements.languageSelect.addEventListener("change", () => {
+      if (state.inputMode === "source") {
+        restoreSourceSample(true);
+      } else {
+        void restoreAstSample(true);
+      }
+    });
     elements.searchInput.addEventListener("input", () => {
       state.searchQuery = elements.searchInput.value.trim().toLowerCase();
       renderTree();
@@ -130,10 +151,11 @@
     }
 
     try {
-      const text = await file.text();
-      elements.jsonInput.value = text;
-      renderFromInput();
-      setMessage(`Loaded ${file.name}`);
+       const text = await file.text();
+       elements.jsonInput.value = text;
+       setControls("ast");
+       renderFromInput();
+       setMessage(`Loaded ${file.name}`);
     } catch (error) {
       setMessage(error.message, true);
     } finally {
@@ -149,6 +171,7 @@
       }
       const text = await response.text();
       elements.jsonInput.value = text;
+      setControls("ast");
       renderFromInput();
       setMessage("Sample AST loaded");
     } catch (error) {
@@ -190,6 +213,142 @@
     }
   }
 
+  const SAMPLE_SOURCES = {
+    c: "int main()\n{\n    int x = 1;\n    return x;\n}\n",
+    go: "package main\n\nfunc main() {\n\tx := 1\n\tprintln(x)\n}\n",
+    java: "class Main {\n    public static void main(String[] args) {\n        int x = 1;\n        System.out.println(x);\n    }\n}\n",
+    lua: "local x = 1\nprint(x)\n",
+    kotlin: "fun main() {\n    val x = 1\n    println(x)\n}\n",
+    python: "def main():\n    x = 1\n    print(x)\n\nmain()\n"
+  };
+
+  const sampleAstCache = new Map();
+
+  async function renderCurrent() {
+    if (state.inputMode === "source") {
+      await generateAstFromSource();
+      return;
+    }
+    renderFromInput();
+  }
+
+  async function generateAstFromSource() {
+    const source = elements.jsonInput.value;
+    if (!source.trim()) {
+      setMessage("Source input is empty", true);
+      return;
+    }
+
+    const language = currentLanguage();
+    setGenerating(true);
+    setMessage(`Generating AST (${language})…`);
+
+    try {
+      const response = await fetch(`/api/ast?language=${encodeURIComponent(language)}`, {
+        method: "POST",
+        headers: { "content-type": "text/plain; charset=utf-8" },
+        body: source
+      });
+
+      const text = await response.text();
+      if (!response.ok) {
+        throw new Error(text || `linvast failed (HTTP ${response.status})`);
+      }
+
+      JSON.parse(text);
+
+      elements.jsonInput.value = text;
+      setControls("ast");
+      renderFromInput();
+    } catch (error) {
+      setMessage(error.message, true);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  function setGenerating(isGenerating) {
+    elements.renderButton.disabled = isGenerating;
+    elements.renderButton.textContent = isGenerating ? "Generating…" : "Render";
+  }
+
+  function currentLanguage() {
+    return elements.languageSelect.value || "c";
+  }
+
+  function isAstJson(text) {
+    if (!text.trim()) {
+      return false;
+    }
+    try {
+      JSON.parse(text);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function setControls(mode) {
+    state.inputMode = mode;
+    elements.modeAst.setAttribute("aria-selected", mode === "ast");
+    elements.modeSource.setAttribute("aria-selected", mode === "source");
+    elements.languageControl.hidden = mode !== "source";
+    elements.formatButton.hidden = mode !== "ast";
+    elements.jsonInput.placeholder = mode === "ast"
+      ? "Paste LINVAST AST JSON"
+      : "Paste source code (C, Go, Java, Lua, Kotlin, Python)";
+  }
+
+  function restoreSourceSample(force) {
+    const lang = currentLanguage();
+    const current = elements.jsonInput.value;
+    if (force || current.trim() === "" || isAstJson(current)) {
+      elements.jsonInput.value = SAMPLE_SOURCES[lang] || SAMPLE_SOURCES.c;
+    }
+  }
+
+  async function restoreAstSample(force) {
+    const lang = currentLanguage();
+    const current = elements.jsonInput.value;
+
+    if (!force && isAstJson(current)) {
+      renderFromInput();
+      return;
+    }
+
+    const cached = sampleAstCache.get(lang);
+    if (cached) {
+      elements.jsonInput.value = cached;
+      renderFromInput();
+      return;
+    }
+
+    setGenerating(true);
+    setMessage(`Loading sample AST (${lang})…`);
+
+    try {
+      const response = await fetch(`/api/ast?language=${encodeURIComponent(lang)}`, {
+        method: "POST",
+        headers: { "content-type": "text/plain; charset=utf-8" },
+        body: SAMPLE_SOURCES[lang] || SAMPLE_SOURCES.c
+      });
+
+      const text = await response.text();
+      if (!response.ok) {
+        throw new Error(text || `linvast failed (HTTP ${response.status})`);
+      }
+
+      JSON.parse(text);
+      sampleAstCache.set(lang, text);
+      elements.jsonInput.value = text;
+      renderFromInput();
+    } catch (error) {
+      setMessage(error.message, true);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   function clearInput() {
     elements.jsonInput.value = "";
     state.ast = null;
@@ -203,6 +362,7 @@
     elements.contentLayer.replaceChildren();
     elements.emptyState.classList.remove("hidden");
     setMessage("");
+    setControls("ast");
     updateStats();
     updateDetails(null);
     elements.statusLine.textContent = "No AST loaded";

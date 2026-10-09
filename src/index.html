@@ -32,8 +32,23 @@
         <aside class="input-panel" aria-label="AST input and node details">
           <section class="panel-section input-section">
             <div class="section-header">
-              <h2>AST Input</h2>
+              <h2>Input</h2>
               <button id="clearButton" type="button">Clear</button>
+            </div>
+            <div class="mode-toggle" role="tablist" aria-label="Input mode">
+              <button id="modeAst" type="button" role="tab" aria-selected="true">AST</button>
+              <button id="modeSource" type="button" role="tab" aria-selected="false">Source</button>
+              <label class="language-control" id="languageControl" hidden>
+                <span>Language</span>
+                <select id="languageSelect">
+                  <option value="c" selected>C</option>
+                  <option value="go">Go</option>
+                  <option value="java">Java</option>
+                  <option value="lua">Lua</option>
+                  <option value="kotlin">Kotlin</option>
+                  <option value="python">Python</option>
+                </select>
+              </label>
             </div>
             <textarea id="jsonInput" spellcheck="false" placeholder="Paste LINVAST AST JSON"></textarea>
             <div class="button-row">
@@ -43,7 +58,7 @@
             <div id="message" class="message" role="status"></div>
           </section>
 
-          <section class="panel-section stats-section">
+            <section class="panel-section stats-section">
             <h2>Stats</h2>
             <dl class="stats-grid">
               <div>
